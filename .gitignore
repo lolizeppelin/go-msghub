@@ -1,0 +1,39 @@
+# Binaries for programs and plugins
+*.exe
+*.dll
+*.so
+*.dylib
+*.PID
+
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+.DS_Store
+
+# Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
+.glide/
+.svn/
+.idea/
+bin/
+!bin/conf
+!bin/conf/*
+test/uints/
+test/uints/*
+vendor
+debug
+.vscode
+ent/.entc
+node_modules
+git-sim_media
+package-lock.json
+
+# vim temp files
+*.swp
+*.swo
+
+examples/testing/server
+examples/demo/cluster_grpc/main
+
+go.sum
