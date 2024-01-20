@@ -36,7 +36,7 @@ func delayQueue(ctx context.Context, dq chan *delayExecutor, eq chan *executor) 
 					overtime = maxDelayTime + Monotonic()
 				}
 			}
-			delay := time.Duration(item.delay) * time.Second
+			delay := item.delay * time.Second
 			at := now + delay
 			pq.Push(item.executor, int64(at))
 			if at < overtime {

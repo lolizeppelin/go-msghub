@@ -13,13 +13,15 @@ type MessageBus struct {
 	eq        chan *executor
 	dq        chan *delayExecutor
 	fork      chan bool
+	trace     func(format string, args ...any)
 
 	context context.Context
 	cancel  func()
 }
 
 // Subscribe 关注消息
-func (m *MessageBus) Subscribe(resource string, event string, callback func(resource, event, trigger string, payload any)) {
+func (m *MessageBus) Subscribe(resource string, event string,
+	callback func(resource, event, trigger string, payload any)) {
 	if event == EventAll {
 		m.callbacks[resource] = append(m.callbacks[resource], callback)
 		return
@@ -29,7 +31,7 @@ func (m *MessageBus) Subscribe(resource string, event string, callback func(reso
 }
 
 // Publish 推送消息,异步, delay单位是秒
-func (m *MessageBus) Publish(resource string, event string, trigger string, payload any, delay ...int64) bool {
+func (m *MessageBus) Publish(resource string, event string, trigger string, payload any, delay ...time.Duration) bool {
 	if !m.has(resource, event) {
 		return false
 	}
@@ -46,6 +48,7 @@ func (m *MessageBus) Publish(resource string, event string, trigger string, payl
 
 // Launch 启动消息总线 executors 执行线程数默认10, waiters 延迟队列数默认4
 func (m *MessageBus) Launch(executors int, waiters int) {
+
 	if m.context != nil {
 		return
 	}
@@ -113,7 +116,7 @@ func (m *MessageBus) Size() int { // 用于外部监控管道长度
 }
 
 // NewMessageBus  通用消息总线  cache是执行队列的长度
-func NewMessageBus(cache int32) *MessageBus {
+func NewMessageBus(cache int32, trace ...func(format string, args ...any)) *MessageBus {
 	if cache < 100 {
 		cache = 100
 	}
@@ -126,6 +129,9 @@ func NewMessageBus(cache int32) *MessageBus {
 		eq:        make(chan *executor, cache),
 		dq:        make(chan *delayExecutor, dcache),
 		callbacks: map[string][]func(resource, event, trigger string, payload any){},
+	}
+	if len(trace) > 0 {
+		m.trace = trace[0]
 	}
 	return m
 }

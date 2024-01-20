@@ -2,11 +2,13 @@ package msghub
 
 import (
 	"fmt"
+	"runtime/debug"
+	"time"
 )
 
 type delayExecutor struct {
 	executor *executor
-	delay    int64
+	delay    time.Duration
 }
 
 type executor struct {
@@ -36,12 +38,9 @@ func (m *MessageBus) process(eq bool) {
 	defer func() {
 		err := recover()
 		if err != nil {
-			//log.Errorf("dispatcher process panic: %v", err)
-			//if log.IsDebugEnabled() {
-			//	buf := make([]byte, 4096)
-			//	l := runtime.Stack(buf, false)
-			//	log.Errorf("%s", buf[:l])
-			//}
+			if m.trace != nil {
+				m.trace("dispatcher process panic\n%s", debug.Stack())
+			}
 			m.fork <- eq
 		}
 	}()
