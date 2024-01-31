@@ -6,21 +6,20 @@ import (
 )
 
 const (
-	maxDelayTime     = time.Second * 30
-	maxPriorityQueue = 8192
+	sleepTime = time.Second * 30
 )
 
 // 延迟队列
-func delayQueue(ctx context.Context, dq chan *delayExecutor, eq chan *executor) {
+func delayQueue(ctx context.Context, total int, dq chan *delayExecutor, eq chan *executor) {
 
 	pq := NewPriorityList()
-	sleep := maxDelayTime
+	sleep := sleepTime
 	overtime := sleep + Monotonic()
 	for {
 		select {
 		case item := <-dq:
 			now := Monotonic()
-			if pq.Len() >= maxPriorityQueue { // 延迟队列过长, 直接发送10个
+			if pq.Len() >= total { // 延迟队列过长, 直接发送10个
 				for i := 0; i < 10; i++ {
 					first := pq.Pop()
 					if first == nil {
@@ -31,14 +30,14 @@ func delayQueue(ctx context.Context, dq chan *delayExecutor, eq chan *executor) 
 					}
 				}
 				if next := pq.Next(); next != nil {
-					overtime = time.Duration(next.Priority())
+					overtime = next.Priority()
 				} else {
-					overtime = maxDelayTime + Monotonic()
+					overtime = sleepTime + Monotonic()
 				}
 			}
 			delay := item.delay * time.Second
 			at := now + delay
-			pq.Push(item.executor, int64(at))
+			pq.Push(item.executor, at)
 			if at < overtime {
 				overtime = at
 			}
@@ -51,8 +50,8 @@ func delayQueue(ctx context.Context, dq chan *delayExecutor, eq chan *executor) 
 			now := Monotonic()
 			item := pq.Pop()
 			if item == nil {
-				sleep = maxDelayTime
-				overtime = sleep + now
+				sleep = sleepTime
+				overtime = sleepTime + now
 				continue
 			}
 			e, ok := item.Payload().(*executor)
@@ -62,11 +61,11 @@ func delayQueue(ctx context.Context, dq chan *delayExecutor, eq chan *executor) 
 			eq <- e
 			next := pq.Next()
 			if next == nil {
-				sleep = maxDelayTime
-				overtime = sleep + now
+				sleep = sleepTime
+				overtime = sleepTime + now
 				continue
 			} else {
-				overtime = time.Duration(next.Priority())
+				overtime = next.Priority()
 				if overtime < now {
 					sleep = 0
 					overtime = now

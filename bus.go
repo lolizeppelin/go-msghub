@@ -6,14 +6,17 @@ import (
 	"time"
 )
 
-const EventAll = "*"
+const (
+	EventAll = "*"
+	MaxDelay = 300
+)
 
 type MessageBus struct {
 	callbacks map[string][]func(resource, event, trigger string, payload any)
 	eq        chan *executor
 	dq        chan *delayExecutor
 	fork      chan bool
-	trace     func(format string, args ...any)
+	log       func(format string, args ...any)
 
 	context context.Context
 	cancel  func()
@@ -31,59 +34,24 @@ func (m *MessageBus) Subscribe(resource string, event string,
 }
 
 // Publish 推送消息,异步, delay单位是秒
-func (m *MessageBus) Publish(resource string, event string, trigger string, payload any, delay ...time.Duration) bool {
+func (m *MessageBus) Publish(resource string, event string, trigger string, payload any, delay ...int) bool {
 	if !m.has(resource, event) {
 		return false
 	}
 	if len(delay) > 0 && delay[0] > 0 {
+		d := delay[0]
+		if d > MaxDelay {
+			d = MaxDelay
+		}
+
 		m.dq <- &delayExecutor{
 			executor: &executor{resource: resource, event: event, trigger: trigger, payload: payload},
-			delay:    delay[0],
+			delay:    time.Duration(d),
 		}
 		return true
 	}
 	m.eq <- &executor{resource: resource, event: event, trigger: trigger, payload: payload}
 	return true
-}
-
-// Launch 启动消息总线 executors 执行线程数默认10, waiters 延迟队列数默认4
-func (m *MessageBus) Launch(executors int, waiters int) {
-
-	if m.context != nil {
-		return
-	}
-
-	if executors <= 0 {
-		executors = 10
-	}
-
-	if waiters <= 0 {
-		waiters = 1
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	m.context = ctx
-	m.cancel = cancel
-
-	go func() { // 执行线程孵化
-		for {
-			select {
-			case q := <-m.fork:
-				go m.process(q)
-			case <-m.context.Done():
-				return
-			}
-		}
-	}()
-
-	for i := 0; i < executors; i++ { // 执行线程
-		m.fork <- true
-	}
-
-	for i := 0; i < waiters; i++ { // 延迟处理线程
-		m.fork <- false
-	}
-
 }
 
 func (m *MessageBus) Stop() {
@@ -95,8 +63,8 @@ func (m *MessageBus) Stop() {
 	m.cancel()
 	defer func() {
 		err := recover()
-		if err != nil {
-			//log.Errorf("dispatcher process panic on stop: %v", err)
+		if err != nil && m.log != nil {
+			m.log("dispatcher process panic on stop: %v", err)
 		}
 	}()
 
@@ -116,22 +84,29 @@ func (m *MessageBus) Size() int { // 用于外部监控管道长度
 }
 
 // NewMessageBus  通用消息总线  cache是执行队列的长度
-func NewMessageBus(cache int32, trace ...func(format string, args ...any)) *MessageBus {
-	if cache < 100 {
-		cache = 100
+func NewMessageBus(log func(format string, args ...any), options ...Option) *MessageBus {
+
+	opts := &Options{
+		executors:     128,
+		executorCache: 1024,
+		queue:         1,
+		queueCache:    128,
+		queueSize:     256,
 	}
-	dcache := cache * 2
-	if dcache > 8192 {
-		dcache = 8192
+
+	for _, o := range options {
+		o(opts)
 	}
+
 	m := &MessageBus{
+		log:       log,
 		fork:      make(chan bool),
-		eq:        make(chan *executor, cache),
-		dq:        make(chan *delayExecutor, dcache),
+		eq:        make(chan *executor, opts.executorCache),
+		dq:        make(chan *delayExecutor, opts.queueCache),
 		callbacks: map[string][]func(resource, event, trigger string, payload any){},
 	}
-	if len(trace) > 0 {
-		m.trace = trace[0]
-	}
+
+	m.launch(opts.executors, opts.queue, opts.queueSize)
+
 	return m
 }

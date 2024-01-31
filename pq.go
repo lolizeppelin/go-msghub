@@ -2,17 +2,18 @@ package msghub
 
 import (
 	"container/heap"
+	"time"
 )
 
 // An Item is something we manage in a priority queue.
 type Item struct {
-	value    any   // The value of the item; arbitrary.
-	priority int64 // The priority of the item in the queue.
+	value    any           // The value of the item; arbitrary.
+	priority time.Duration // The priority of the item in the queue.
 	// The index is needed by update and is maintained by the heap.Interface methods.
 	index int // The index of the item in the heap.
 }
 
-func (i *Item) Priority() int64 {
+func (i *Item) Priority() time.Duration {
 	return i.priority
 }
 
@@ -54,7 +55,7 @@ func (pq *PriorityQueue) Pop() any {
 }
 
 // update modifies the priority and value of an Item in the queue.
-func (pq *PriorityQueue) update(item *Item, value string, priority int64) {
+func (pq *PriorityQueue) update(item *Item, value string, priority time.Duration) {
 	item.value = value
 	item.priority = priority
 	heap.Fix(pq, item.index)
@@ -80,7 +81,7 @@ func (l *PriorityList) Next() *Item {
 	return l.pq[0]
 }
 
-func (l *PriorityList) Push(v any, priority int64) {
+func (l *PriorityList) Push(v any, priority time.Duration) {
 	item := &Item{
 		value:    v,
 		priority: priority,
