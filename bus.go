@@ -8,7 +8,7 @@ import (
 
 const (
 	EventAll = "*"
-	MaxDelay = 300
+	MaxDelay = 600 // 最大延迟600s
 )
 
 type MessageBus struct {
@@ -100,7 +100,7 @@ func NewMessageBus(log func(format string, args ...any), options ...Option) *Mes
 
 	m := &MessageBus{
 		log:       log,
-		fork:      make(chan bool),
+		fork:      make(chan bool, 32),
 		eq:        make(chan *executor, opts.executorCache),
 		dq:        make(chan *delayExecutor, opts.queueCache),
 		callbacks: map[string][]func(resource, event, trigger string, payload any){},

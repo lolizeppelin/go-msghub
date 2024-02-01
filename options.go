@@ -1,11 +1,11 @@
 package msghub
 
 const (
-	MaxExecutorsNum  = 4096
-	MaxExecutorCache = 50000
+	MaxExecutorsNum  = 8192
+	MaxExecutorCache = 100000
 
 	MaxQueueNum   = 256
-	MaxQueueCache = 4096
+	MaxQueueCache = 8192
 	MaxQueueSize  = 8192
 )
 

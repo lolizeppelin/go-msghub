@@ -64,12 +64,12 @@ func (m *MessageBus) launch(executors int, queue int, total int) {
 		}
 	}()
 
-	for i := 0; i < executors; i++ { // 执行线程
-		m.fork <- true
-	}
-
 	for i := 0; i < queue; i++ { // 延迟处理线程
 		m.fork <- false
+	}
+
+	for i := 0; i < executors; i++ { // 执行线程
+		m.fork <- true
 	}
 
 }
