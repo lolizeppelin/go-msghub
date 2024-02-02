@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime/debug"
+	"sync/atomic"
 	"time"
 )
 
@@ -64,7 +65,7 @@ func (m *MessageBus) launch(executors int, queue int, total int) {
 		}
 	}()
 
-	for i := 0; i < queue; i++ { // 延迟处理线程
+	for i := 0; i < queue; i++ { // 延迟队列处理线程
 		m.fork <- false
 	}
 
@@ -84,6 +85,10 @@ func (m *MessageBus) spawn(eq bool, total int) {
 				m.log("dispatcher process panic\n%s", debug.Stack())
 			}
 			m.fork <- eq
+		} else { // 下面的循环正常结束,退出
+			if !eq {
+				atomic.AddInt32(m.queue, -1)
+			}
 		}
 	}()
 
@@ -97,6 +102,7 @@ func (m *MessageBus) spawn(eq bool, total int) {
 			}
 		}
 	} else {
+		atomic.AddInt32(m.queue, 1)
 		delayQueue(m.context, total, m.dq, m.eq)
 	}
 

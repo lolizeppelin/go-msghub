@@ -3,6 +3,7 @@ package msghub
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 )
 
@@ -17,6 +18,7 @@ type MessageBus struct {
 	dq        chan *delayExecutor
 	fork      chan bool
 	log       func(format string, args ...any)
+	queue     *int32 // 延迟队列处理协程
 
 	context context.Context
 	cancel  func()
@@ -54,12 +56,19 @@ func (m *MessageBus) Publish(resource string, event string, trigger string, payl
 	return true
 }
 
-func (m *MessageBus) Stop() {
-
+// Stop 停止消息总线,wait为最大等待时间
+func (m *MessageBus) Stop(wait ...time.Duration) {
+	var wt time.Duration
+	if len(wait) > 0 {
+		wt = wait[0]
+	}
+	if wt < 0 {
+		wt = 1
+	}
+	wt = wt * time.Second
 	if m.cancel == nil {
 		return
 	}
-
 	m.cancel()
 	defer func() {
 		err := recover()
@@ -68,12 +77,34 @@ func (m *MessageBus) Stop() {
 		}
 	}()
 
-	// 清空执行队列
+	// 清空执行队列(延迟队列可能不停的推送到执行队列中,所以需要等待)
 	for {
 		select {
 		case c := <-m.eq:
 			c.execute(m)
-		case <-time.After(time.Second * 3):
+		priority:
+			for {
+				select {
+				case _c := <-m.eq:
+					_c.execute(m)
+				default:
+					break priority
+				}
+			}
+			if atomic.LoadInt32(m.queue) <= 0 { // 延迟线程已经结束
+				for {
+					select {
+					case _c := <-m.eq:
+						_c.execute(m)
+					default:
+						return
+					}
+				}
+			}
+		case <-time.After(wt):
+			if atomic.LoadInt32(m.queue) > 0 {
+				m.log("delay thread not finished")
+			}
 			return
 		}
 	}
@@ -104,6 +135,7 @@ func NewMessageBus(log func(format string, args ...any), options ...Option) *Mes
 		eq:        make(chan *executor, opts.executorCache),
 		dq:        make(chan *delayExecutor, opts.queueCache),
 		callbacks: map[string][]func(resource, event, trigger string, payload any){},
+		queue:     new(int32),
 	}
 
 	m.launch(opts.executors, opts.queue, opts.queueSize)
