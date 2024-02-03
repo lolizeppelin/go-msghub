@@ -22,8 +22,17 @@ type Options struct {
 	// 延迟队列管道长度
 	queueCache int
 
-	// 延迟队列长度
+	// 延迟队列最大长度,超过长度会立刻弹出现有队列中的10个元素
+
 	queueSize int
+
+	log func(format string, args ...any)
+}
+
+func WithLog(log func(format string, args ...any)) Option {
+	return func(o *Options) {
+		o.log = log
+	}
 }
 
 func WithExecutors(num int32) Option {

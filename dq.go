@@ -10,7 +10,7 @@ const (
 )
 
 // 延迟队列
-func delayQueue(ctx context.Context, total int, dq chan *delayExecutor, eq chan *executor) {
+func delayQueue(ctx context.Context, total int, dq chan *Item, eq chan *executor) {
 
 	pq := NewPriorityList()
 	sleep := sleepTime
@@ -29,38 +29,42 @@ func delayQueue(ctx context.Context, total int, dq chan *delayExecutor, eq chan 
 				}
 				// 重算等待时间
 				if next := pq.Next(); next != nil {
-					overtime = next.at
+					overtime = next.priority
 				} else {
-					overtime = sleepTime + Monotonic()
+					// 队列最小长度128,弹出10个元素不可能队列为空
+					overtime = item.priority
 				}
 			}
 			pq.Push(item)
-			if item.at < overtime {
-				overtime = item.at
+			if item.priority < overtime {
+				overtime = item.priority
 			}
 			sleep = overtime - now
 		case <-time.After(sleep):
 			now := Monotonic()
-			item := pq.Pop()
-			if item == nil {
-				sleep = sleepTime
-				overtime = sleepTime + now
-				continue
-			}
-			eq <- item.executor
 			// 重算等待时间
-			next := pq.Next()
-			if next == nil {
-				sleep = sleepTime
-				overtime = sleepTime + now
-				continue
-			}
-			overtime = next.at
-			if overtime < now {
-				sleep = 0
-				overtime = now
-			} else {
-				sleep = overtime - now
+			fire := 0
+			for {
+				next := pq.Next()
+				if next == nil {
+					sleep = sleepTime
+					overtime = sleepTime + now
+					break
+				}
+				if next.priority <= now {
+					fire += 1
+					if fire > 10 { // 避免堵死
+						overtime = now
+						sleep = 0
+						break
+					}
+					item := pq.Pop()
+					eq <- item.executor
+				} else {
+					overtime = next.priority
+					sleep = overtime - now
+					break
+				}
 			}
 		case <-ctx.Done():
 			// 清空优先级队列

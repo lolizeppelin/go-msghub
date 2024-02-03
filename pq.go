@@ -5,14 +5,20 @@ import (
 	"time"
 )
 
+type Item struct {
+	executor *executor
+	index    int
+	priority time.Duration
+}
+
 // A PriorityQueue implements heap.Interface and holds Items.
-type PriorityQueue []*delayExecutor
+type PriorityQueue []*Item
 
 func (pq PriorityQueue) Len() int { return len(pq) }
 
 func (pq PriorityQueue) Less(i, j int) bool {
 	// We want Pop to give us the highest, not lowest, priority so we use greater than here.
-	return pq[i].at < pq[j].at
+	return pq[i].priority < pq[j].priority
 }
 
 func (pq PriorityQueue) Swap(i, j int) {
@@ -23,7 +29,7 @@ func (pq PriorityQueue) Swap(i, j int) {
 
 func (pq *PriorityQueue) Push(x any) {
 	n := len(*pq)
-	item := x.(*delayExecutor)
+	item := x.(*Item)
 	item.index = n
 	*pq = append(*pq, item)
 }
@@ -36,12 +42,6 @@ func (pq *PriorityQueue) Pop() any {
 	item.index = -1 // for safety
 	*pq = old[0 : n-1]
 	return item
-}
-
-// Update modifies the priority and value of an Item in the queue.
-func (pq *PriorityQueue) Update(item *delayExecutor, at time.Duration) {
-	item.at = at
-	heap.Fix(pq, item.index)
 }
 
 // PriorityList 堆排序实现的优先级队列,每次弹出优先级最小的对象
@@ -57,20 +57,20 @@ func NewPriorityList() *PriorityList {
 	}
 }
 
-func (l *PriorityList) Next() *delayExecutor {
+func (l *PriorityList) Next() *Item {
 	if l.Len() < 1 {
 		return nil
 	}
 	return l.pq[0]
 }
 
-func (l *PriorityList) Push(item *delayExecutor) {
+func (l *PriorityList) Push(item *Item) {
 	heap.Push(&l.pq, item)
 }
 
-func (l *PriorityList) Pop() *delayExecutor {
+func (l *PriorityList) Pop() *Item {
 	if l.pq.Len() > 0 {
-		item := heap.Pop(&l.pq).(*delayExecutor)
+		item := heap.Pop(&l.pq).(*Item)
 		return item
 	}
 	return nil

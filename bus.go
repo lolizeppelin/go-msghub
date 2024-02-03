@@ -15,7 +15,7 @@ const (
 type MessageBus struct {
 	callbacks map[string][]func(resource, event, trigger string, payload any)
 	eq        chan *executor
-	dq        chan *delayExecutor
+	dq        chan *Item
 	fork      chan bool
 	log       func(format string, args ...any)
 	queue     *int32 // 延迟队列处理协程
@@ -46,9 +46,9 @@ func (m *MessageBus) Publish(resource string, event string, trigger string, payl
 			d = MaxDelay
 		}
 
-		m.dq <- &delayExecutor{
+		m.dq <- &Item{
 			executor: &executor{resource: resource, event: event, trigger: trigger, payload: payload},
-			at:       Monotonic() + time.Duration(d),
+			priority: Monotonic() + time.Duration(d)*time.Second,
 		}
 		return true
 	}
@@ -56,16 +56,18 @@ func (m *MessageBus) Publish(resource string, event string, trigger string, payl
 	return true
 }
 
-// Stop 停止消息总线,wait为最大等待时间
+// Stop 停止消息总线,wait为最大等待时间,单位s
 func (m *MessageBus) Stop(wait ...time.Duration) {
 	var wt time.Duration
 	if len(wait) > 0 {
 		wt = wait[0]
 	}
-	if wt < 0 {
-		wt = 1
+	if wt < 1 {
+		wt = time.Millisecond * 250
+	} else {
+		wt = wt * time.Second
 	}
-	wt = wt * time.Second
+
 	if m.cancel == nil {
 		return
 	}
@@ -115,14 +117,14 @@ func (m *MessageBus) Size() int { // 用于外部监控管道长度
 }
 
 // NewMessageBus  通用消息总线  cache是执行队列的长度
-func NewMessageBus(log func(format string, args ...any), options ...Option) *MessageBus {
+func NewMessageBus(options ...Option) *MessageBus {
 
 	opts := &Options{
 		executors:     128,
 		executorCache: 1024,
 		queue:         1,
-		queueCache:    128,
-		queueSize:     256,
+		queueCache:    256,
+		queueSize:     512,
 	}
 
 	for _, o := range options {
@@ -130,10 +132,10 @@ func NewMessageBus(log func(format string, args ...any), options ...Option) *Mes
 	}
 
 	m := &MessageBus{
-		log:       log,
+		log:       opts.log,
 		fork:      make(chan bool, 32),
 		eq:        make(chan *executor, opts.executorCache),
-		dq:        make(chan *delayExecutor, opts.queueCache),
+		dq:        make(chan *Item, opts.queueCache),
 		callbacks: map[string][]func(resource, event, trigger string, payload any){},
 		queue:     new(int32),
 	}

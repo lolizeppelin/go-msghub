@@ -5,14 +5,7 @@ import (
 	"fmt"
 	"runtime/debug"
 	"sync/atomic"
-	"time"
 )
-
-type delayExecutor struct {
-	executor *executor
-	index    int
-	at       time.Duration
-}
 
 type executor struct {
 	resource string
@@ -44,7 +37,7 @@ func (m *MessageBus) has(resource string, event string) bool {
 	return ok
 }
 
-// launch 启动消息总线 executors 执行线程数默认10, waiters 延迟队列数默认4
+// launch 启动消息总线
 func (m *MessageBus) launch(executors int, queue int, total int) {
 
 	if m.context != nil {
