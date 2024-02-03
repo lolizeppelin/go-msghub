@@ -21,31 +21,24 @@ func delayQueue(ctx context.Context, total int, dq chan *delayExecutor, eq chan 
 			now := Monotonic()
 			if pq.Len() >= total { // 延迟队列过长, 直接发送10个
 				for i := 0; i < 10; i++ {
-					first := pq.Pop()
-					if first == nil {
+					fire := pq.Pop()
+					if fire == nil {
 						break
 					}
-					if e, ok := first.Payload().(*executor); ok {
-						eq <- e
-					}
+					eq <- fire.executor
 				}
+				// 重算等待时间
 				if next := pq.Next(); next != nil {
-					overtime = next.Priority()
+					overtime = next.at
 				} else {
 					overtime = sleepTime + Monotonic()
 				}
 			}
-			delay := item.delay * time.Second
-			at := now + delay
-			pq.Push(item.executor, at)
-			if at < overtime {
-				overtime = at
+			pq.Push(item)
+			if item.at < overtime {
+				overtime = item.at
 			}
 			sleep = overtime - now
-			if sleep <= 0 {
-				sleep = 0
-				overtime = now
-			}
 		case <-time.After(sleep):
 			now := Monotonic()
 			item := pq.Pop()
@@ -54,24 +47,20 @@ func delayQueue(ctx context.Context, total int, dq chan *delayExecutor, eq chan 
 				overtime = sleepTime + now
 				continue
 			}
-			e, ok := item.Payload().(*executor)
-			if !ok {
-				continue
-			}
-			eq <- e
+			eq <- item.executor
+			// 重算等待时间
 			next := pq.Next()
 			if next == nil {
 				sleep = sleepTime
 				overtime = sleepTime + now
 				continue
+			}
+			overtime = next.at
+			if overtime < now {
+				sleep = 0
+				overtime = now
 			} else {
-				overtime = next.Priority()
-				if overtime < now {
-					sleep = 0
-					overtime = now
-				} else {
-					sleep = overtime - now
-				}
+				sleep = overtime - now
 			}
 		case <-ctx.Done():
 			// 清空优先级队列
@@ -80,11 +69,7 @@ func delayQueue(ctx context.Context, total int, dq chan *delayExecutor, eq chan 
 				if item == nil {
 					break
 				}
-				e, ok := item.Payload().(*executor)
-				if !ok {
-					continue
-				}
-				eq <- e
+				eq <- item.executor
 			}
 			// 清空延迟管道
 			for {

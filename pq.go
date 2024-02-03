@@ -5,30 +5,14 @@ import (
 	"time"
 )
 
-// An Item is something we manage in a priority queue.
-type Item struct {
-	value    any           // The value of the item; arbitrary.
-	priority time.Duration // The priority of the item in the queue.
-	// The index is needed by update and is maintained by the heap.Interface methods.
-	index int // The index of the item in the heap.
-}
-
-func (i *Item) Priority() time.Duration {
-	return i.priority
-}
-
-func (i *Item) Payload() any {
-	return i.value
-}
-
 // A PriorityQueue implements heap.Interface and holds Items.
-type PriorityQueue []*Item
+type PriorityQueue []*delayExecutor
 
 func (pq PriorityQueue) Len() int { return len(pq) }
 
 func (pq PriorityQueue) Less(i, j int) bool {
 	// We want Pop to give us the highest, not lowest, priority so we use greater than here.
-	return pq[i].priority < pq[j].priority
+	return pq[i].at < pq[j].at
 }
 
 func (pq PriorityQueue) Swap(i, j int) {
@@ -39,7 +23,7 @@ func (pq PriorityQueue) Swap(i, j int) {
 
 func (pq *PriorityQueue) Push(x any) {
 	n := len(*pq)
-	item := x.(*Item)
+	item := x.(*delayExecutor)
 	item.index = n
 	*pq = append(*pq, item)
 }
@@ -54,10 +38,9 @@ func (pq *PriorityQueue) Pop() any {
 	return item
 }
 
-// update modifies the priority and value of an Item in the queue.
-func (pq *PriorityQueue) update(item *Item, value string, priority time.Duration) {
-	item.value = value
-	item.priority = priority
+// Update modifies the priority and value of an Item in the queue.
+func (pq *PriorityQueue) Update(item *delayExecutor, at time.Duration) {
+	item.at = at
 	heap.Fix(pq, item.index)
 }
 
@@ -74,24 +57,20 @@ func NewPriorityList() *PriorityList {
 	}
 }
 
-func (l *PriorityList) Next() *Item {
+func (l *PriorityList) Next() *delayExecutor {
 	if l.Len() < 1 {
 		return nil
 	}
 	return l.pq[0]
 }
 
-func (l *PriorityList) Push(v any, priority time.Duration) {
-	item := &Item{
-		value:    v,
-		priority: priority,
-	}
+func (l *PriorityList) Push(item *delayExecutor) {
 	heap.Push(&l.pq, item)
 }
 
-func (l *PriorityList) Pop() *Item {
+func (l *PriorityList) Pop() *delayExecutor {
 	if l.pq.Len() > 0 {
-		item := heap.Pop(&l.pq).(*Item)
+		item := heap.Pop(&l.pq).(*delayExecutor)
 		return item
 	}
 	return nil

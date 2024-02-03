@@ -48,7 +48,7 @@ func (m *MessageBus) Publish(resource string, event string, trigger string, payl
 
 		m.dq <- &delayExecutor{
 			executor: &executor{resource: resource, event: event, trigger: trigger, payload: payload},
-			delay:    time.Duration(d),
+			at:       Monotonic() + time.Duration(d),
 		}
 		return true
 	}

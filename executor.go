@@ -10,7 +10,8 @@ import (
 
 type delayExecutor struct {
 	executor *executor
-	delay    time.Duration
+	index    int
+	at       time.Duration
 }
 
 type executor struct {
