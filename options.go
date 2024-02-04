@@ -1,12 +1,12 @@
 package msghub
 
 const (
-	MaxExecutorsNum  = 8192
+	MaxExecutorsNum  = 2 * 8192
 	MaxExecutorCache = 100000
 
 	MaxQueueNum   = 256
 	MaxQueueCache = 8192
-	MaxQueueSize  = 8192
+	MaxQueueSize  = 8 * 8192
 )
 
 type Option func(*Options)
