@@ -3,6 +3,7 @@ package msghub
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"sync/atomic"
 	"time"
 )
@@ -75,7 +76,7 @@ func (m *MessageBus) Stop(wait ...time.Duration) {
 	defer func() {
 		err := recover()
 		if err != nil && m.log != nil {
-			m.log("dispatcher process panic on stop: %v", err)
+			m.log("dispatcher process panic on stop\n%s", debug.Stack())
 		}
 	}()
 
