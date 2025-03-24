@@ -2,17 +2,16 @@ package msghub
 
 import (
 	"container/heap"
-	"time"
 )
 
-type Item struct {
-	executor *executor
-	index    int
-	priority time.Duration
-}
+//type Item struct {
+//	message  *message
+//	index    int
+//	priority time.Duration
+//}
 
 // A PriorityQueue implements heap.Interface and holds Items.
-type PriorityQueue []*Item
+type PriorityQueue []*message
 
 func (pq PriorityQueue) Len() int { return len(pq) }
 
@@ -29,7 +28,7 @@ func (pq PriorityQueue) Swap(i, j int) {
 
 func (pq *PriorityQueue) Push(x any) {
 	n := len(*pq)
-	item := x.(*Item)
+	item := x.(*message)
 	item.index = n
 	*pq = append(*pq, item)
 }
@@ -57,20 +56,20 @@ func NewPriorityList() *PriorityList {
 	}
 }
 
-func (l *PriorityList) Next() *Item {
+func (l *PriorityList) Next() *message {
 	if l.Len() < 1 {
 		return nil
 	}
 	return l.pq[0]
 }
 
-func (l *PriorityList) Push(item *Item) {
+func (l *PriorityList) Push(item *message) {
 	heap.Push(&l.pq, item)
 }
 
-func (l *PriorityList) Pop() *Item {
+func (l *PriorityList) Pop() *message {
 	if l.pq.Len() > 0 {
-		item := heap.Pop(&l.pq).(*Item)
+		item := heap.Pop(&l.pq).(*message)
 		return item
 	}
 	return nil

@@ -10,14 +10,14 @@ const (
 )
 
 // 延迟队列
-func delayQueue(ctx context.Context, total int, dq chan *Item, eq chan *executor) {
+func delayQueue(signal context.Context, total int, dq chan *message, eq chan *message) {
 
 	pq := NewPriorityList()
 	sleep := sleepTime
 	overtime := sleep + Monotonic()
 	for {
 		select {
-		case item := <-dq:
+		case msg := <-dq:
 			now := Monotonic()
 			if pq.Len() >= total { // 延迟队列过长, 直接发送10个
 				for i := 0; i < 10; i++ {
@@ -25,19 +25,19 @@ func delayQueue(ctx context.Context, total int, dq chan *Item, eq chan *executor
 					if fire == nil {
 						break
 					}
-					eq <- fire.executor
+					eq <- fire
 				}
 				// 重算等待时间
 				if next := pq.Next(); next != nil {
 					overtime = next.priority
 				} else {
 					// 队列最小长度128,弹出10个元素不可能队列为空
-					overtime = item.priority
+					overtime = msg.priority
 				}
 			}
-			pq.Push(item)
-			if item.priority < overtime {
-				overtime = item.priority
+			pq.Push(msg)
+			if msg.priority < overtime {
+				overtime = msg.priority
 			}
 			sleep = overtime - now
 		case <-time.After(sleep):
@@ -59,27 +59,27 @@ func delayQueue(ctx context.Context, total int, dq chan *Item, eq chan *executor
 						break
 					}
 					item := pq.Pop()
-					eq <- item.executor
+					eq <- item
 				} else {
 					overtime = next.priority
 					sleep = overtime - now
 					break
 				}
 			}
-		case <-ctx.Done():
+		case <-signal.Done():
 			// 清空优先级队列
 			for {
-				item := pq.Pop()
-				if item == nil {
+				msg := pq.Pop()
+				if msg == nil {
 					break
 				}
-				eq <- item.executor
+				eq <- msg
 			}
 			// 清空延迟管道
 			for {
 				select {
-				case item := <-dq:
-					eq <- item.executor
+				case msg := <-dq:
+					eq <- msg
 				default:
 					return
 				}

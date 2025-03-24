@@ -1,8 +1,8 @@
 package msghub
 
 const (
-	MaxExecutorsNum  = 2 * 8192
-	MaxExecutorCache = 100000
+	MaxExecutorsNum = 2 * 8192
+	MaxMsgCache     = 100000
 
 	MaxQueueNum   = 256
 	MaxQueueCache = 8192
@@ -18,7 +18,7 @@ type Options struct {
 	queue int
 
 	// 执行队列管道长度
-	executorCache int
+	msgCache int
 	// 延迟队列管道长度
 	queueCache int
 
@@ -52,10 +52,22 @@ func WithExecutorCache(num int32) Option {
 		if num < 0 {
 			num = 128
 		}
-		if num >= MaxExecutorCache {
-			num = MaxExecutorCache
+		if num >= MaxMsgCache {
+			num = MaxMsgCache
 		}
-		o.executorCache = int(num)
+		o.msgCache = int(num)
+	}
+}
+
+func WithMsgCache(num int32) Option {
+	return func(o *Options) {
+		if num < 0 {
+			num = 128
+		}
+		if num >= MaxMsgCache {
+			num = MaxMsgCache
+		}
+		o.msgCache = int(num)
 	}
 }
 

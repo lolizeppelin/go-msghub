@@ -7,23 +7,16 @@ import (
 	"sync/atomic"
 )
 
-type executor struct {
-	resource string
-	event    string
-	trigger  string
-	payload  any
-}
-
-func (c *executor) execute(bus *MessageBus) {
-	key := fmt.Sprintf("%s.%s", c.resource, c.event)
-	if callbacks, ok := bus.callbacks[key]; ok {
+func (m *MessageBus) execute(msg *message) {
+	key := fmt.Sprintf("%s.%s", msg.resource, msg.event)
+	if callbacks, ok := m.callbacks[key]; ok {
 		for _, cb := range callbacks {
-			cb(c.resource, c.event, c.trigger, c.payload)
+			cb(msg.ctx, msg.resource, msg.event, msg.trigger, msg.payload)
 		}
 	}
-	if callbacks, ok := bus.callbacks[c.resource]; ok {
+	if callbacks, ok := m.callbacks[msg.resource]; ok {
 		for _, cb := range callbacks {
-			cb(c.resource, c.event, c.trigger, c.payload)
+			cb(msg.ctx, msg.resource, msg.event, msg.trigger, msg.payload)
 		}
 	}
 }
@@ -40,12 +33,12 @@ func (m *MessageBus) has(resource string, event string) bool {
 // launch 启动消息总线
 func (m *MessageBus) launch(executors int, queue int, total int) {
 
-	if m.context != nil {
+	if m.signal != nil {
 		return
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	m.context = ctx
+	m.signal = ctx
 	m.cancel = cancel
 
 	go func() { // 执行线程孵化
@@ -53,7 +46,7 @@ func (m *MessageBus) launch(executors int, queue int, total int) {
 			select {
 			case q := <-m.fork:
 				go m.spawn(q, total)
-			case <-m.context.Done():
+			case <-m.signal.Done():
 				return
 			}
 		}
@@ -89,15 +82,15 @@ func (m *MessageBus) spawn(eq bool, total int) {
 	if eq {
 		for {
 			select {
-			case c := <-m.eq:
-				c.execute(m)
-			case <-m.context.Done():
+			case msg := <-m.eq:
+				m.execute(msg)
+			case <-m.signal.Done():
 				return
 			}
 		}
 	} else {
 		atomic.AddInt32(m.queue, 1)
-		delayQueue(m.context, total, m.dq, m.eq)
+		delayQueue(m.signal, total, m.dq, m.eq)
 	}
 
 }
