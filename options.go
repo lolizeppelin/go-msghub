@@ -26,10 +26,10 @@ type Options struct {
 
 	queueSize int
 
-	log func(format string, args ...any)
+	log LoginHandler
 }
 
-func WithLog(log func(format string, args ...any)) Option {
+func WithLog(log LoginHandler) Option {
 	return func(o *Options) {
 		o.log = log
 	}

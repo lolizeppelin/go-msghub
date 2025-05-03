@@ -9,35 +9,68 @@ import (
 
 func TestBus(t *testing.T) {
 
-	log := func(format string, args ...any) {
-		fmt.Println(fmt.Sprintf(format, args...))
+	log := func(ctx context.Context, msg string, args ...any) {
+		fmt.Println(msg)
+		for _, arg := range args {
+			fmt.Printf("args %v\n", arg)
+		}
 	}
 
 	bus := NewMessageBus(WithLog(log), WithDelayQueue(1))
-	bus.Subscribe("a", "b", func(context context.Context, resource, event, trigger string, payload any) {
-		fmt.Printf("yes %s ~ %v\n", trigger, payload)
+
+	bus.Subscribe("a", "b", func(msg *Message) {
+		fmt.Printf("yes %s ~ %v\n", msg.Trigger, msg.Payload)
 	})
 
-	bus.Subscribe("a", "c", func(context context.Context, resource, event, trigger string, payload any) {
-		fmt.Printf("yes %s ~ %v\n", trigger, payload)
+	bus.Subscribe("a", "c", func(msg *Message) {
+		fmt.Printf("yes %s ~ %v\n", msg.Trigger, msg.Payload)
 		panic("dispatcher panic test")
 	})
 
-	bus.Subscribe("a", "d", func(context context.Context, resource, event, trigger string, payload any) {
+	bus.Subscribe("a", "d", func(msg *Message) {
 		//panic("failed")
-		fmt.Printf("yes %s ~ %v\n", trigger, payload)
+		fmt.Printf("yes %s ~ %v\n", msg.Trigger, msg.Payload)
 	})
-	ctx := context.Background()
-	bus.Publish(ctx, "a", "b", "nodelay", "ok")
-	bus.Publish(ctx, "a", "b", "delay", "ok", 5)
-	bus.Publish(ctx, "a", "c", "panic", "ok", 3)
-	bus.Publish(ctx, "a", "d", "stop1", "ok", 15)
-	bus.Publish(ctx, "a", "d", "stop2", "ok", 15)
-	bus.Publish(ctx, "a", "d", "stop3", "ok", 15)
-	bus.Publish(ctx, "a", "d", "stop4", "ok", 15)
-	bus.Publish(ctx, "a", "d", "stop5", "ok", 15)
+
+	msg := &Message{
+		Ctx:      context.Background(),
+		Resource: "a",
+		Event:    "b",
+		Trigger:  "nodelay",
+		Payload:  "ok",
+	}
+	bus.Publish(msg)
+
+	msg = msg.Clone()
+	msg.Trigger = "delay"
+	bus.Publish(msg, 5)
+
+	msg = msg.Clone()
+	msg.Event = "c"
+	msg.Trigger = "panic"
+	bus.Publish(msg, 3)
+
+	msg = msg.Clone()
+	msg.Event = "d"
+	msg.Trigger = "stop1"
+	bus.Publish(msg, 5)
+
+	msg = msg.Clone()
+	msg.Event = "d"
+	msg.Trigger = "stop2"
+	bus.Publish(msg, 15)
+
+	msg = msg.Clone()
+	msg.Event = "d"
+	msg.Trigger = "stop3"
+	bus.Publish(msg, 15)
+
+	msg = msg.Clone()
+	msg.Event = "d"
+	msg.Trigger = "stop4"
+	bus.Publish(msg, 15)
 
 	time.Sleep(time.Second * 10)
-	bus.Stop(10)
+	bus.Stop()
 
 }

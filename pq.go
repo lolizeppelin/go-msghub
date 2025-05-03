@@ -11,7 +11,7 @@ import (
 //}
 
 // A PriorityQueue implements heap.Interface and holds Items.
-type PriorityQueue []*message
+type PriorityQueue []*Message
 
 func (pq PriorityQueue) Len() int { return len(pq) }
 
@@ -28,7 +28,7 @@ func (pq PriorityQueue) Swap(i, j int) {
 
 func (pq *PriorityQueue) Push(x any) {
 	n := len(*pq)
-	item := x.(*message)
+	item := x.(*Message)
 	item.index = n
 	*pq = append(*pq, item)
 }
@@ -56,20 +56,20 @@ func NewPriorityList() *PriorityList {
 	}
 }
 
-func (l *PriorityList) Next() *message {
+func (l *PriorityList) Next() *Message {
 	if l.Len() < 1 {
 		return nil
 	}
 	return l.pq[0]
 }
 
-func (l *PriorityList) Push(item *message) {
+func (l *PriorityList) Push(item *Message) {
 	heap.Push(&l.pq, item)
 }
 
-func (l *PriorityList) Pop() *message {
+func (l *PriorityList) Pop() *Message {
 	if l.pq.Len() > 0 {
-		item := heap.Pop(&l.pq).(*message)
+		item := heap.Pop(&l.pq).(*Message)
 		return item
 	}
 	return nil

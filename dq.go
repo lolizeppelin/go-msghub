@@ -10,7 +10,7 @@ const (
 )
 
 // 延迟队列
-func delayQueue(signal context.Context, total int, dq chan *message, eq chan *message) {
+func delayQueue(signal context.Context, total int, dq chan *Message, eq chan *Message) {
 
 	pq := NewPriorityList()
 	sleep := sleepTime
