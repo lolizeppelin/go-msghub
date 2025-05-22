@@ -7,6 +7,8 @@ const (
 	MaxQueueNum   = 256
 	MaxQueueCache = 8192
 	MaxQueueSize  = 8 * 8192
+
+	MaxDeadLetter = 100000
 )
 
 type Option func(*Options)
@@ -26,6 +28,8 @@ type Options struct {
 
 	queueSize int
 
+	deadLetter int32
+
 	log LoginHandler
 }
 
@@ -37,7 +41,7 @@ func WithLog(log LoginHandler) Option {
 
 func WithExecutors(num int32) Option {
 	return func(o *Options) {
-		if num < 0 {
+		if num <= 0 {
 			num = 2
 		}
 		if num >= MaxExecutorsNum {
@@ -49,7 +53,7 @@ func WithExecutors(num int32) Option {
 
 func WithExecutorCache(num int32) Option {
 	return func(o *Options) {
-		if num < 0 {
+		if num <= 0 {
 			num = 128
 		}
 		if num >= MaxMsgCache {
@@ -61,7 +65,7 @@ func WithExecutorCache(num int32) Option {
 
 func WithMsgCache(num int32) Option {
 	return func(o *Options) {
-		if num < 0 {
+		if num <= 0 {
 			num = 128
 		}
 		if num >= MaxMsgCache {
@@ -73,7 +77,7 @@ func WithMsgCache(num int32) Option {
 
 func WithDelayQueue(num int32) Option {
 	return func(o *Options) {
-		if num < 0 {
+		if num <= 0 {
 			num = 1
 		}
 		if num >= MaxQueueNum {
@@ -85,7 +89,7 @@ func WithDelayQueue(num int32) Option {
 
 func WithDelayQueueCache(num int32) Option {
 	return func(o *Options) {
-		if num < 0 {
+		if num <= 0 {
 			num = 128
 		}
 		if num >= MaxQueueCache {
@@ -97,12 +101,24 @@ func WithDelayQueueCache(num int32) Option {
 
 func WithDelayQueueSize(num int32) Option {
 	return func(o *Options) {
-		if num < 0 {
+		if num <= 0 {
 			num = 128
 		}
 		if num >= MaxQueueSize {
 			num = MaxQueueSize
 		}
 		o.queueSize = int(num)
+	}
+}
+
+func WithDeadLetter(num int32) Option {
+	return func(o *Options) {
+		if num <= 0 {
+			return
+		}
+		if num >= MaxDeadLetter {
+			num = MaxDeadLetter
+		}
+		o.deadLetter = num
 	}
 }

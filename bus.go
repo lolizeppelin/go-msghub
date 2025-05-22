@@ -3,6 +3,7 @@ package msghub
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 )
 
@@ -18,6 +19,8 @@ type MessageBus struct {
 	fork      chan bool
 	log       LoginHandler
 	queue     *int32 // 延迟队列处理协程
+
+	deadLetter *int32 // 死信线程数量
 
 	signal context.Context
 	cancel context.CancelFunc
@@ -60,7 +63,16 @@ func (m *MessageBus) syncPublish(msg *Message) error {
 	case m.eq <- msg:
 		return nil
 	default:
-		return ErrorHubClosed
+		if atomic.LoadInt32(m.deadLetter) <= 0 {
+			return ErrBlocked
+		}
+		go func() {
+			atomic.AddInt32(m.deadLetter, -1)
+			m.execute(msg)
+			atomic.AddInt32(m.deadLetter, 1)
+		}()
+
+		return nil
 	}
 }
 
@@ -77,6 +89,7 @@ func NewMessageBus(options ...Option) *MessageBus {
 		queue:      1,
 		queueCache: 256,
 		queueSize:  512,
+		deadLetter: 512,
 		log: func(ctx context.Context, format string, args ...any) {
 			// empty
 		},
@@ -85,17 +98,20 @@ func NewMessageBus(options ...Option) *MessageBus {
 	for _, o := range options {
 		o(opts)
 	}
+
+	deadLetter := opts.deadLetter
 	ctx, cancel := context.WithCancel(context.Background())
 
 	m := &MessageBus{
-		log:       opts.log,
-		fork:      make(chan bool, 32),
-		eq:        make(chan *Message, opts.msgCache),
-		dq:        make(chan *Message, opts.queueCache),
-		callbacks: map[string][]MessageHandler{},
-		queue:     new(int32),
-		signal:    ctx,
-		cancel:    cancel,
+		log:        opts.log,
+		fork:       make(chan bool, 32),
+		eq:         make(chan *Message, opts.msgCache),
+		dq:         make(chan *Message, opts.queueCache),
+		callbacks:  map[string][]MessageHandler{},
+		queue:      new(int32),
+		deadLetter: &deadLetter,
+		signal:     ctx,
+		cancel:     cancel,
 	}
 
 	m.launch(opts.executors, opts.queue, opts.queueSize)

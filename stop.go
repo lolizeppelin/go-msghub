@@ -11,7 +11,7 @@ func (m *MessageBus) Stop() {
 	m.cancel()
 
 	defer func() {
-		close(m.eq)
+		//close(m.eq)
 		err := recover()
 		if err != nil {
 			m.log(m.signal, "dispatcher process panic on stop", "stack", debug.Stack())

@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	ErrorHubClosed     = errors.New("msg hub already closed")
+	ErrBlocked         = errors.New("msg hub blocked")
 	ErrorNotSubscribed = errors.New("handler not subscribed in msg hub")
 )
 
