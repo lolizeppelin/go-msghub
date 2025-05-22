@@ -3,7 +3,6 @@ package msghub
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
 	"time"
 )
 
@@ -20,8 +19,6 @@ type MessageBus struct {
 	log       LoginHandler
 	queue     *int32 // 延迟队列处理协程
 
-	deadLetter *int32 // 死信线程数量
-
 	signal context.Context
 	cancel context.CancelFunc
 }
@@ -36,22 +33,26 @@ func (m *MessageBus) Subscribe(resource string, event string, callback MessageHa
 	m.callbacks[key] = append(m.callbacks[key], callback)
 }
 
-// Publish 推送消息,异步, delay单位是秒
+// Publish 推送消息,异步, delay单位是秒,异步队列需要判断是否提前执行
 func (m *MessageBus) Publish(msg *Message, delay ...int) error {
 	if !m.has(msg.Resource, msg.Event) {
 		return ErrorNotSubscribed
 	}
+	msg.priority = 0
+	msg.enqueue = time.Now().Unix()
 	if len(delay) > 0 && delay[0] > 0 {
 		d := delay[0]
 		if d > MaxDelay {
 			d = MaxDelay
 		}
+		msg.delay = int64(d)
 		msg.priority = Monotonic() + time.Duration(d)*time.Second
 		select {
 		case m.dq <- msg:
 			return nil
 		case <-m.signal.Done():
-			msg.priority = 0
+			return m.syncPublish(msg)
+		default:
 			return m.syncPublish(msg)
 		}
 	}
@@ -63,16 +64,7 @@ func (m *MessageBus) syncPublish(msg *Message) error {
 	case m.eq <- msg:
 		return nil
 	default:
-		if atomic.LoadInt32(m.deadLetter) <= 0 {
-			return ErrBlocked
-		}
-		go func() {
-			atomic.AddInt32(m.deadLetter, -1)
-			m.execute(msg)
-			atomic.AddInt32(m.deadLetter, 1)
-		}()
-
-		return nil
+		return ErrBlocked
 	}
 }
 
@@ -89,7 +81,6 @@ func NewMessageBus(options ...Option) *MessageBus {
 		queue:      1,
 		queueCache: 256,
 		queueSize:  512,
-		deadLetter: 512,
 		log: func(ctx context.Context, format string, args ...any) {
 			// empty
 		},
@@ -99,19 +90,17 @@ func NewMessageBus(options ...Option) *MessageBus {
 		o(opts)
 	}
 
-	deadLetter := opts.deadLetter
 	ctx, cancel := context.WithCancel(context.Background())
 
 	m := &MessageBus{
-		log:        opts.log,
-		fork:       make(chan bool, 32),
-		eq:         make(chan *Message, opts.msgCache),
-		dq:         make(chan *Message, opts.queueCache),
-		callbacks:  map[string][]MessageHandler{},
-		queue:      new(int32),
-		deadLetter: &deadLetter,
-		signal:     ctx,
-		cancel:     cancel,
+		log:       opts.log,
+		fork:      make(chan bool, 32),
+		eq:        make(chan *Message, opts.msgCache),
+		dq:        make(chan *Message, opts.queueCache),
+		callbacks: map[string][]MessageHandler{},
+		queue:     new(int32),
+		signal:    ctx,
+		cancel:    cancel,
 	}
 
 	m.launch(opts.executors, opts.queue, opts.queueSize)

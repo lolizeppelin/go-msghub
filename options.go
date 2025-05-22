@@ -28,8 +28,6 @@ type Options struct {
 
 	queueSize int
 
-	deadLetter int32
-
 	log LoginHandler
 }
 
@@ -108,17 +106,5 @@ func WithDelayQueueSize(num int32) Option {
 			num = MaxQueueSize
 		}
 		o.queueSize = int(num)
-	}
-}
-
-func WithDeadLetter(num int32) Option {
-	return func(o *Options) {
-		if num <= 0 {
-			return
-		}
-		if num >= MaxDeadLetter {
-			num = MaxDeadLetter
-		}
-		o.deadLetter = num
 	}
 }

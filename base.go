@@ -25,7 +25,18 @@ type Message struct {
 
 	index    int
 	priority time.Duration
-	at       *time.Time
+
+	delay   int64 // 延迟时间
+	enqueue int64 // 入列时间
+	at      *time.Time
+}
+
+// Offset 执行时间偏移预期的秒数
+func (m *Message) Offset() int64 {
+	if m.at == nil {
+		return 0
+	}
+	return m.enqueue + m.delay - m.at.Unix()
 }
 
 func (m *Message) ExecuteAtUnix() int64 {
