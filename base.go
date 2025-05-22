@@ -15,6 +15,18 @@ type MessageHandler func(message *Message)
 
 type LoginHandler func(ctx context.Context, msg string, args ...any)
 
+// NewFinalMsg  最终消息、强制执行
+func NewFinalMsg(ctx context.Context, resource, event, trigger string, payload any) *Message {
+	return &Message{
+		Ctx:      ctx,
+		Resource: resource,
+		Event:    event,
+		Trigger:  trigger,
+		Payload:  payload,
+		final:    true,
+	}
+}
+
 type Message struct {
 	Ctx      context.Context
 	Resource string
@@ -26,6 +38,7 @@ type Message struct {
 	index    int
 	priority time.Duration
 
+	final   bool
 	delay   int64 // 延迟时间
 	enqueue int64 // 入列时间
 	at      *time.Time
@@ -56,6 +69,7 @@ func (m *Message) ExecuteAtMilli() int64 {
 func (m *Message) Clone() *Message {
 	n := *m
 	n.index = 0
+	n.enqueue = 0
 	n.priority = 0
 	n.at = nil
 	return &n

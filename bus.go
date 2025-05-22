@@ -64,6 +64,10 @@ func (m *MessageBus) syncPublish(msg *Message) error {
 	case m.eq <- msg:
 		return nil
 	default:
+		if msg.final {
+			m.execute(msg)
+			return nil
+		}
 		return ErrBlocked
 	}
 }
