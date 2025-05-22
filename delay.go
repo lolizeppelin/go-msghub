@@ -1,7 +1,6 @@
 package msghub
 
 import (
-	"context"
 	"time"
 )
 
@@ -10,14 +9,14 @@ const (
 )
 
 // 延迟队列
-func delayQueue(signal context.Context, total int, dq chan *Message, eq chan *Message) {
+func (m *MessageBus) async(total int) {
 
 	pq := NewPriorityList()
 	sleep := sleepTime
 	overtime := sleep + Monotonic()
 	for {
 		select {
-		case msg := <-dq:
+		case msg := <-m.dq:
 			now := Monotonic()
 			if pq.Len() >= total { // 延迟队列过长, 直接发送10个
 				for i := 0; i < 10; i++ {
@@ -25,7 +24,7 @@ func delayQueue(signal context.Context, total int, dq chan *Message, eq chan *Me
 					if fire == nil {
 						break
 					}
-					eq <- fire
+					m.eq <- fire
 				}
 				// 重算等待时间
 				if next := pq.Next(); next != nil {
@@ -59,27 +58,27 @@ func delayQueue(signal context.Context, total int, dq chan *Message, eq chan *Me
 						break
 					}
 					item := pq.Pop()
-					eq <- item
+					m.eq <- item
 				} else {
 					overtime = next.priority
 					sleep = overtime - now
 					break
 				}
 			}
-		case <-signal.Done():
+		case <-m.signal.Done():
 			// 清空优先级队列
 			for {
 				msg := pq.Pop()
 				if msg == nil {
 					break
 				}
-				eq <- msg
+				m.eq <- msg
 			}
 			// 清空延迟管道
 			for {
 				select {
-				case msg := <-dq:
-					eq <- msg
+				case msg := <-m.dq:
+					m.eq <- msg
 				default:
 					return
 				}

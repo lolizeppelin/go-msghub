@@ -7,25 +7,12 @@ import (
 )
 
 var (
-	ErrBlocked         = errors.New("msg hub blocked")
 	ErrorNotSubscribed = errors.New("handler not subscribed in msg hub")
 )
 
 type MessageHandler func(message *Message)
 
-type LoginHandler func(ctx context.Context, msg string, args ...any)
-
-// NewFinalMsg  最终消息、强制执行
-func NewFinalMsg(ctx context.Context, resource, event, trigger string, payload any) *Message {
-	return &Message{
-		Ctx:      ctx,
-		Resource: resource,
-		Event:    event,
-		Trigger:  trigger,
-		Payload:  payload,
-		final:    true,
-	}
-}
+type LoggingHandler func(ctx context.Context, msg string, args ...any)
 
 type Message struct {
 	Ctx      context.Context
@@ -38,7 +25,6 @@ type Message struct {
 	index    int
 	priority time.Duration
 
-	final   bool
 	delay   int64 // 延迟时间
 	enqueue int64 // 入列时间
 	at      *time.Time

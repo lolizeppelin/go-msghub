@@ -85,7 +85,7 @@ func (m *MessageBus) spawn(sync bool, total int) {
 		}
 	} else {
 		atomic.AddInt32(m.queue, 1)
-		delayQueue(m.signal, total, m.dq, m.eq)
+		m.async(total)
 	}
 
 }

@@ -16,7 +16,7 @@ type MessageBus struct {
 	eq        chan *Message
 	dq        chan *Message
 	fork      chan bool
-	log       LoginHandler
+	log       LoggingHandler
 	queue     *int32 // 延迟队列处理协程
 
 	signal context.Context
@@ -34,9 +34,10 @@ func (m *MessageBus) Subscribe(resource string, event string, callback MessageHa
 }
 
 // Publish 推送消息,异步, delay单位是秒,异步队列需要判断是否提前执行
-func (m *MessageBus) Publish(msg *Message, delay ...int) error {
+func (m *MessageBus) Publish(msg *Message, delay ...int) (err error) {
 	if !m.has(msg.Resource, msg.Event) {
-		return ErrorNotSubscribed
+		err = ErrorNotSubscribed
+		return
 	}
 	msg.priority = 0
 	msg.enqueue = time.Now().Unix()
@@ -51,25 +52,25 @@ func (m *MessageBus) Publish(msg *Message, delay ...int) error {
 		case m.dq <- msg:
 			return nil
 		case <-m.signal.Done():
-			return m.syncPublish(msg)
+			m.syncPublish(msg)
+			return
 		default:
-			return m.syncPublish(msg)
+			m.syncPublish(msg)
+			return
 		}
 	}
-	return m.syncPublish(msg)
+	m.syncPublish(msg)
+	return
 }
 
-func (m *MessageBus) syncPublish(msg *Message) error {
+func (m *MessageBus) syncPublish(msg *Message) {
 	select {
 	case m.eq <- msg:
-		return nil
-	default:
-		if msg.final {
-			m.execute(msg)
-			return nil
-		}
-		return ErrBlocked
+		return
+	default: // 异步转同步
+		m.execute(msg)
 	}
+	return
 }
 
 func (m *MessageBus) Size() int { // 用于外部监控管道长度
