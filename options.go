@@ -7,8 +7,6 @@ const (
 	MaxQueueNum   = 256
 	MaxQueueCache = 8192
 	MaxQueueSize  = 8 * 8192
-
-	MaxDeadLetter = 100000
 )
 
 type Option func(*Options)
@@ -28,10 +26,10 @@ type Options struct {
 
 	queueSize int
 
-	log LoginHandler
+	log LoggingHandler
 }
 
-func WithLog(log LoginHandler) Option {
+func WithLog(log LoggingHandler) Option {
 	return func(o *Options) {
 		o.log = log
 	}
