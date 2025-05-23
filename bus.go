@@ -3,6 +3,7 @@ package msghub
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"time"
 )
 
@@ -34,10 +35,9 @@ func (m *MessageBus) Subscribe(resource string, event string, callback MessageHa
 }
 
 // Publish 推送消息,异步, delay单位是秒,异步队列需要判断是否提前执行
-func (m *MessageBus) Publish(msg *Message, delay ...int) (err error) {
+func (m *MessageBus) Publish(msg *Message, delay ...int) error {
 	if !m.has(msg.Resource, msg.Event) {
-		err = ErrorNotSubscribed
-		return
+		return ErrorNotSubscribed
 	}
 	msg.priority = 0
 	msg.enqueue = time.Now().Unix()
@@ -52,22 +52,34 @@ func (m *MessageBus) Publish(msg *Message, delay ...int) (err error) {
 		case m.dq <- msg:
 			return nil
 		case <-m.signal.Done():
-			m.syncPublish(msg)
-			return
+
+			return m.syncPublish(msg)
 		default:
-			m.syncPublish(msg)
-			return
+			return m.syncPublish(msg)
 		}
 	}
-	m.syncPublish(msg)
-	return
+	return m.syncPublish(msg)
+
 }
 
-func (m *MessageBus) syncPublish(msg *Message) {
+func (m *MessageBus) syncPublish(msg *Message) (err error) {
 	select {
 	case m.eq <- msg:
 		return
 	default: // 异步转同步
+		defer func() {
+			r := recover()
+			if r == nil {
+				return
+			}
+			m.log(m.signal, "dispatcher sync execute", "panic", r, "stack", debug.Stack())
+			var ok bool
+			if err, ok = r.(error); ok {
+				return
+			}
+			err = fmt.Errorf("dispatcher sync execute panic %v", r)
+		}()
+
 		m.execute(msg)
 	}
 	return

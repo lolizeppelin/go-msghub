@@ -63,15 +63,18 @@ func (m *MessageBus) launch(executors int, queue int, total int) {
 func (m *MessageBus) spawn(sync bool, total int) {
 
 	defer func() {
-		err := recover()
-		if err != nil {
-			m.log(m.signal, "dispatcher process panic", "stack", debug.Stack())
-			m.fork <- sync
-		} else { // 下面的循环正常结束,退出
+		r := recover()
+		if r == nil { // 正常退出
 			if !sync {
 				atomic.AddInt32(m.queue, -1)
 			}
+			return
 		}
+
+		// 出现panic
+		m.log(m.signal, "dispatcher process panic", "panic", r, "stack", debug.Stack())
+		m.fork <- sync
+
 	}()
 
 	if sync {
