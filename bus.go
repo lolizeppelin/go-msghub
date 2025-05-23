@@ -53,8 +53,18 @@ func (m *MessageBus) Publish(resource string, event string, trigger string, payl
 		}
 		return true
 	}
-	m.eq <- &executor{resource: resource, event: event, trigger: trigger, payload: payload}
+	m.syncPublish(&executor{resource: resource, event: event, trigger: trigger, payload: payload})
 	return true
+}
+
+func (m *MessageBus) syncPublish(msg *executor) {
+	select {
+	case m.eq <- msg:
+		return
+	default: // 异步转同步
+		msg.execute(m)
+	}
+	return
 }
 
 // Stop 停止消息总线,wait为最大等待时间,单位s
